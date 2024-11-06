@@ -11,23 +11,7 @@ EXCLUDED_EXTENSIONS = [
     '.wmv', '.mid', '.bam', '.ppt'
 ]
 
-STOP_WORDS = {
-    "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't", 
-    "as", "at", "be", "because", "been", "before", "being", "below", "between", "both", "but", "by", 
-    "can't", "cannot", "could", "couldn't", "did", "didn't", "do", "does", "doesn't", "doing", "don't", 
-    "down", "during", "each", "few", "for", "from", "further", "had", "hadn't", "has", "hasn't", "have", 
-    "haven't", "having", "he", "he'd", "he'll", "he's", "her", "here", "here's", "hers", "herself", "him", 
-    "himself", "his", "how", "how's", "i", "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't", 
-    "it", "it's", "its", "itself", "let's", "me", "more", "most", "mustn't", "my", "myself", "no", "nor", 
-    "not", "of", "off", "on", "once", "only", "or", "other", "ought", "our", "ours", "ourselves", "out", 
-    "over", "own", "same", "shan't", "she", "she'd", "she'll", "she's", "should", "shouldn't", "so", "some", 
-    "such", "than", "that", "that's", "the", "their", "theirs", "them", "themselves", "then", "there", 
-    "there's", "these", "they", "they'd", "they'll", "they're", "they've", "this", "those", "through", "to", 
-    "too", "under", "until", "up", "very", "was", "wasn't", "we", "we'd", "we'll", "we're", "we've", "were", 
-    "weren't", "what", "what's", "when", "when's", "where", "where's", "which", "while", "who", "who's", 
-    "whom", "why", "why's", "with", "won't", "would", "wouldn't", "you", "you'd", "you'll", "you're", "you've", 
-    "your", "yours", "yourself", "yourselves"
-}
+STOP_WORDS = [ "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't", "as", "at", "be", "because", "been", "before", "being", "below", "between", "both", "but", "by", "can't", "cannot", "could", "couldn't", "did", "didn't", "do", "does", "doesn't", "doing", "don't", "down", "during", "each", "few", "for", "from", "further", "had", "hadn't", "has", "hasn't", "have", "haven't", "having", "he", "he'd", "he'll", "he's", "her", "here", "here's", "hers", "herself", "him", "himself", "his", "how", "how's", "i", "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't", "it", "it's", "its", "itself", "let's", "me", "more", "most", "mustn't", "my", "myself", "no", "nor", "not", "of", "off", "on", "once", "only", "or", "other", "ought", "our", "ours", "ourselves", "out", "over", "own", "same", "shan't", "she", "she'd", "she'll", "she's", "should", "shouldn't", "so", "some", "such", "than", "that", "that's", "the", "their", "theirs", "them", "themselves", "then", "there", "there's", "these", "they", "they'd", "they'll", "they're", "they've", "this", "those", "through", "to", "too", "under", "until", "up", "very", "was", "wasn't", "we", "we'd", "we'll", "we're", "we've", "were", "weren't", "what", "what's", "when", "when's", "where", "where's", "which", "while", "who", "who's", "whom", "why", "why's", "with", "won't", "would", "wouldn't", "you", "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves", "zero", "able", "across", "among", "anyhow", "anyone", "anything", "anyway", "anywhere", "beside", "besides", "between", "beyond", "con", "considering", "could", "de", "due", "except", "excepting", "followed", "following", "gone", "instead", "inside", "neither", "next", "nobody", "none", "nor", "outside", "perhaps", "regarding", "since", "someone", "something", "sometime", "sometimes", "somewhere", "throughout", "toward", "towards", "unless", "unlike", "upon", "whenever", "wherever", "whichever", "whilst", "without", "yes", "yet" ]
 
 class ContentStats:
     def __init__(self):
@@ -78,34 +62,49 @@ def is_valid(url):
     Checks whether a given URL is valid for further processing.
     """
     try:
-        parsed = urlparse(url)
-        url = parsed._replace(fragment="").geturl()
-        if parsed.scheme not in set(["http", "https"]):
+        # Parse the URL and remove any fragment
+        parsed_url = urlparse(url)
+        sanitized_url = parsed_url._replace(fragment="").geturl()
+        
+        # Check for a valid scheme
+        if parsed_url.scheme not in {"http", "https"}:
             return False
-        if not re.match(r".*\.(ics|cs|informatics|stat)\.uci\.edu.*", parsed.netloc):
+        
+        # Ensure the URL matches specific domains
+        valid_domains_pattern = r".*\.(ics|cs|informatics|stat)\.uci\.edu.*"
+        if not re.match(valid_domains_pattern, parsed_url.netloc):
             return False
-        if any(parsed.path.lower().endswith(ext) for ext in EXCLUDED_EXTENSIONS):
-            return False  
+        
+        # Check if the path ends with any excluded extension
+        if any(sanitized_url.lower().endswith(ext) for ext in EXCLUDED_EXTENSIONS):
+            return False
+        
+        # URL passed all checks
         return True
-    except TypeError:
-        print("TypeError for URL:", url)
+    except TypeError as e:
+        print(f"Error processing URL: {url} - {e}")
         raise
 
 def extract_next_links(url, resp):
     """
     Extracts links from the content of a given URL.
     """
+    # Return an empty list if the response is not valid
     if resp.status != 200 or not resp.raw_response:
         return []
     
+    # Parse the page content using BeautifulSoup
     soup = BeautifulSoup(resp.raw_response.content, 'html.parser')
-    links = []
-    for link in soup.find_all('a', href=True):
-        absolute_link = urljoin(resp.raw_response.url, link['href'])
-        absolute_link = urlparse(absolute_link)._replace(fragment="").geturl()
-        if is_valid(absolute_link): 
-            links.append(absolute_link)
-    return links
+    
+    # Generate a set of unique, valid absolute links
+    links = {
+        urlparse(urljoin(resp.raw_response.url, anchor['href']))._replace(fragment="").geturl()
+        for anchor in soup.find_all('a', href=True)
+        if is_valid(urlparse(urljoin(resp.raw_response.url, anchor['href']))._replace(fragment="").geturl())
+    }
+    
+    # Convert the set to a list for consistent output
+    return list(links)
 
 def process_content(url, content, stats):
     """Process page content and update statistics."""
