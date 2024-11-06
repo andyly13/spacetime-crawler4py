@@ -169,7 +169,7 @@ def save_longest_page():
 
 def save_subdomain_info():
     with open('subdomains.txt', 'w') as file:
-        for subdomain, urls in sorted(subdomain_pages.items()):
+        for subdomain, urls in sorted((k, v) for k, v in subdomain_pages.items() if k is not None):
             example_url = next(iter(urls))
             parsed_url = urlparse(example_url)
             scheme = parsed_url.scheme
